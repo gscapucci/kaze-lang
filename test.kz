@@ -1,0 +1,75 @@
+// Variables
+var x: i32 = 0;
+let name = "world";
+const PI: f64 = 3.14159;
+
+// Function
+fn greet(name: *const u8) void {
+    // ...
+}
+
+// Struct
+const Vec2 = struct {
+    x: f32,
+    y: f32,
+    fn len(self: *Self) f32 { return 0.0; }
+};
+var v = Vec2{.x = 1.0, .y = 2.0};
+
+// Enum
+const Color = enum { Red, Green, Blue };
+let c = Color::Red;
+
+// Algebraic enum
+const Msg = enum {
+    Quit,
+    Move{ x: i32, y: i32 },
+    Write(*const u8),
+};
+
+// Union (C interop)
+const Bits = union {
+    as_i32: i32,
+    as_f32: f32,
+};
+
+// Error handling
+let val = try parse(input);
+let val = parse(input) catch return;
+let val = parse(input)!;
+
+// Match
+match color {
+    Color::Red   => { }
+    Color::Green => { }
+    Color::Blue  => { }
+}
+
+// C interop
+const c = @cimport("string.h");
+let len = c.strlen(ptr);
+
+
+
+// normal header
+const sdl = @cimport("SDL3/SDL.h");
+
+// STB-style — compiler generates and compiles the implementation unit automatically
+const stb_image = @cimport("stb_image.h", .{
+    .defines = {"STB_IMAGE_IMPLEMENTATION"},
+});
+
+// multiple defines
+const stb_tt = @cimport("stb_truetype.h", .{
+    .defines = {"STB_TRUETYPE_IMPLEMENTATION", "STB_RECT_PACK_IMPLEMENTATION"},
+});
+
+
+
+when @os("linux") {
+    // linux-specific
+} else when @os("windows") {
+    // windows-specific
+} else when @os("android") {
+    
+}
