@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-
+#include <stdlib.h>
 
 VECTOR_IMPLEMENTATION(Token, Token)
 VECTOR_IMPLEMENTATION(char *, Error)
@@ -232,25 +232,30 @@ static Token lexer_double_char_op(Lexer *lexer) {
     return make_undefine_token();
 }
 static Token lexer_single_char_op(Lexer *lexer) {
+    fprintf(stderr, "%s:%s:%d: Unimplemented\n", __FILE__, __func__, __LINE__);
+    exit(1);
     struct {
         const char *op;
         TokenType type;
     } op[] = {
-        {"<<", TOKEN_LESS_LESS},
-        {">>", TOKEN_GREATER_GREATER},
-        {"<=", TOKEN_LESS_EQ},
-        {">=", TOKEN_GREATER_EQ},
-        {"+=", TOKEN_PLUS_EQ},
-        {"-=", TOKEN_MINUS_EQ},
-        {"*=", TOKEN_STAR_EQ},
-        {"/=", TOKEN_SLASH_EQ},
-        {"==", TOKEN_EQ_EQ},
-        {"!=", TOKEN_BANG_EQ},
-        {"%=", TOKEN_MOD_EQ},
+        {"="},
+        {"."},
+        {"*"},
+        {"+"},
+        {"/"},
+        {"%"},
+        {"<"},
+        {">"},
     };
     for(size_t i = 0; i < ARR_LEN(op); i++) {
-        
+        const char *operator = op[i].op;
+        const TokenType type = op[i].type;
+        const char *lexer_curr = &lexer->source[lexer->pos];
+        if(!strncmp(operator, lexer_curr, strlen(operator))) {
+            return create_token(type, string_view_create(lexer_curr, strlen(operator)), lexer->line, lexer->col);
+        }
     }
+    return make_undefine_token();
 }
 
 static Token lexer_next_token(Lexer *lexer) {
