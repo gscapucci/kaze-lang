@@ -19,11 +19,12 @@ struct ArenaBlock {
 };
 
 struct Arena {
-    ArenaBlock *normal_head;
-    ArenaBlock *normal_current;
+    ArenaBlock *head;
+    ArenaBlock *current;
     
-    ArenaBlock *reallocable_head;
-    ArenaBlock *reallocable_current;
+    void **tracked;
+    size_t tracked_len;
+    size_t tracked_cap;
     
     size_t default_block_cap;
     size_t alignment;

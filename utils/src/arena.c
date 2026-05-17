@@ -1,4 +1,5 @@
 #include "../include/arena.h"
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -8,21 +9,23 @@ static inline size_t align_forward(size_t ptr, size_t alignment) {
     return (ptr + mask) & ~mask;
 }
 
-static inline size_t max(size_t a, size_t b) {
+static inline size_t arena_max(size_t a, size_t b) {
     return a > b ? a : b;
 }
 
 static inline ArenaBlock *block_new(size_t cap) {
-    ArenaBlock *block = malloc(sizeof(ArenaBlock) * cap);
-    if(block == NULL) {
-        fprintf(stderr, "malloc error in %s\n", __func__);
+    ArenaBlock *block = malloc(sizeof(ArenaBlock) + cap);
+    if (!block) {
+        fprintf(stderr, "malloc error\n");
         exit(1);
     }
+
     block->cap = cap;
-    block->next = NULL;
     block->used = 0;
+    block->next = NULL;
+
     return block;
-} 
+}
 
 Arena *arena_new(size_t default_block_cap) {
     Arena *new_arena = malloc(sizeof(Arena));
@@ -30,51 +33,49 @@ Arena *arena_new(size_t default_block_cap) {
         fprintf(stderr, "malloc error in %s\n", __func__);
         exit(1);
     }
-    new_arena->default_block_cap = max(default_block_cap, ARENA_BLOCK_SIZE);
+    new_arena->default_block_cap = arena_max(default_block_cap, ARENA_BLOCK_SIZE);
     new_arena->alignment = 8;
     
-    new_arena->normal_current = NULL;
-    new_arena->normal_head = NULL;
+    new_arena->current = NULL;
+    new_arena->head = NULL;
 
-    new_arena->reallocable_head = NULL;
-    new_arena->reallocable_current = NULL;
+    new_arena->tracked = NULL;
+    new_arena->tracked_cap = 0;
+    new_arena->tracked_len = 0;
 
     return new_arena;
 }
 
 void arena_delete(Arena *arena) {
     arena_clear(arena);
+    free(arena->tracked);
     free(arena);
 }
 
 void *arena_alloc(Arena *arena, size_t size) {
-    if(arena == NULL || size == 0) return NULL;
-    
+    if (!arena || size == 0) return NULL;
+
     size = align_forward(size, arena->alignment);
-    
-    if(arena->normal_head == NULL) {
-        ArenaBlock *new_block = block_new(max(size, arena->default_block_cap));
-        void *data = new_block->data;
-        new_block->used += size;
 
-        arena->normal_head = new_block;
-        arena->normal_current = arena->normal_head;
+    ArenaBlock *b = arena->current;
 
-        return data;
+    if (!b) {
+        b = block_new(arena->default_block_cap);
+        arena->head = b;
+        arena->current = b;
     }
-    if(arena->normal_current->used + size > arena->normal_current->cap) {
-        ArenaBlock *new_block = block_new(max(size, arena->default_block_cap));
-        void *data = new_block->data;
-        new_block->used += size;
 
-        arena->normal_current->next = new_block;
-
-        return data;
+    if (b->used + size > b->cap) {
+        ArenaBlock *new_block = block_new(arena_max(size, arena->default_block_cap));
+        b->next = new_block;
+        arena->current = new_block;
+        b = new_block;
     }
-    void *data = arena->normal_current->data + arena->normal_current->used;
-    arena->normal_current->used += size;
-    return data;
 
+    void *ptr = b->data + b->used;
+    b->used += size;
+
+    return ptr;
 }
 
 void *arena_alloc_zeroed(Arena *arena, size_t size) {
@@ -85,62 +86,63 @@ void *arena_alloc_zeroed(Arena *arena, size_t size) {
 }
 
 void *arena_alloc_reallocable(Arena *arena, size_t size) {
-    if(arena == NULL || size == 0) return NULL;
+    if (!arena || size == 0) return NULL;
 
-    ArenaBlock *new_block = block_new(size);
-    void *ptr = new_block->data;
-    
-    if(arena->reallocable_current == NULL) {
-        
-
-        arena->reallocable_head = new_block;
-        arena->reallocable_current = arena->reallocable_head;
-
-        return ptr;
+    if (arena->tracked_len >= arena->tracked_cap) {
+        size_t new_cap = arena->tracked_cap == 0 ? 8 : arena->tracked_cap * 2;
+        void **new_tracked = realloc(arena->tracked, new_cap * sizeof(void *));
+        if (!new_tracked) { fprintf(stderr, "realloc error\n"); exit(1); }
+        arena->tracked = new_tracked;
+        arena->tracked_cap = new_cap;
     }
-    arena->reallocable_current->next = new_block;
-    return ptr;
+
+    void *data = malloc(size);
+    if (!data) { fprintf(stderr, "malloc error\n"); exit(1); }
+    arena->tracked[arena->tracked_len++] = data;
+    return data;
 }
 
 void *arena_realloc(Arena *arena, void *ptr, size_t new_size) {
-    if(arena == NULL) return NULL;
-    if(ptr == NULL) {
-        fprintf(stderr, "Could not realloc NULL pointer\n");
-        exit(1);
+    if (!arena || !ptr) return NULL;
+
+    for (size_t i = 0; i < arena->tracked_len; i++) {
+        if (ptr == arena->tracked[i]) {
+            void *new_ptr = realloc(arena->tracked[i], new_size);
+            if (!new_ptr) { fprintf(stderr, "realloc error\n"); exit(1); }
+            arena->tracked[i] = new_ptr;
+            return new_ptr;
+        }
     }
-    ArenaBlock *curr = arena->reallocable_head;
-    while (ptr != NULL && ptr != curr->data) curr = curr->next;
-    if(ptr == NULL) {
-        fprintf(stderr, "ptr not found in the arena\n");
-        exit(1);
-    }
-    curr = realloc(curr, sizeof(ArenaBlock) + new_size);
-    return curr->data;
+
+    fprintf(stderr, "arena_realloc: pointer not tracked\n");
+    exit(1);
 }
+
+
 
 void arena_clear(Arena *arena) {
     arena_clear_normal(arena);
     arena_clear_reallocable(arena);
 }
 void arena_clear_normal(Arena *arena) {
-    ArenaBlock *curr = arena->normal_head;
-    while(curr != NULL) {
-        ArenaBlock *next = curr->next;
-        free(curr);
-        curr = next;
+    ArenaBlock *b = arena->head;
+
+    while (b) {
+        ArenaBlock *next = b->next;
+        free(b);
+        b = next;
     }
-    arena->normal_head = NULL;
-    arena->normal_current = NULL;
+
+    arena->head = NULL;
+    arena->current = NULL;
 }
+
 void arena_clear_reallocable(Arena *arena) {
-    ArenaBlock *curr = arena->reallocable_head;
-    while(curr != NULL) {
-        ArenaBlock *next = curr->next;
-        free(curr);
-        curr = next;
+    if(!arena) return;
+    for(size_t i = 0; i < arena->tracked_len; i++) {
+        free(arena->tracked[i]);
     }
-    arena->reallocable_head = NULL;
-    arena->reallocable_current = NULL;
+    arena->tracked_len = 0;
 }
 
 void arena_set_alignment(Arena *arena, size_t alignment) {

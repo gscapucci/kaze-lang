@@ -12,6 +12,7 @@ typedef enum TokenType {
 
     TOKEN_FLOAT_LIT, // 123.321
     TOKEN_INT_LIT, // 123
+    TOKEN_STRING_LIT, // "Hello"
     TOKEN_ERROR, // invalid token
     TOKEN_IDENT, // var name, func name, identifiers
 
@@ -30,6 +31,26 @@ typedef enum TokenType {
     TOKEN_BANG_EQ, // !=
     TOKEN_MOD_EQ, // %=
 
+    TOKEN_EQ, // =
+    TOKEN_DOT, // .
+    TOKEN_STAR, // *
+    TOKEN_PLUS, // +
+    TOKEN_SLASH, // /
+    TOKEN_MOD, // %
+    TOKEN_LESS, // <
+    TOKEN_GREATER, // >
+
+    TOKEN_LBRACE, // {
+    TOKEN_RBRACE, // }
+    TOKEN_SEMICOLON, // ;
+    TOKEN_COMMA, // ,
+    TOKEN_COLON, // :
+    TOKEN_LPAREN, // (
+    TOKEN_RPAREN, // )
+    TOKEN_LBRACKET, // [
+    TOKEN_RBRACKET, // ]
+    TOKEN_BANG, // !
+    TOKEN_AT, // @
     
 
     //keywords

@@ -1,5 +1,4 @@
 #include "../include/lexer.h"
-#include "../../utils/include/hashmap.h"
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,7 +8,6 @@
 VECTOR_IMPLEMENTATION(Token, Token)
 VECTOR_IMPLEMENTATION(char *, Error)
 
-static HashMap keyword_map = {0};
 
 
 #define ARR_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -43,15 +41,11 @@ static void keyword_map_init(HashMap *map, Arena *arena) {
         {"union", TOKEN_UNION},
     };
 
-    Arena *map_arena = arena_alloc(arena, sizeof(Arena));
-    *map = hashmap_create(map_arena, 0);
+    
+    *map = hashmap_create(arena, 0);
     for(size_t i = 0; i < ARR_LEN(keywords_kv); i++) {
         hashmap_put(map, keywords_kv[i].key, &keywords_kv[i].type);
     }
-}
-
-static void keyword_map_deinit(HashMap *map) {
-    arena_clear(map->arena);
 }
 
 static inline bool lexer_is_at_end(Lexer *lexer) {
@@ -130,13 +124,34 @@ static Token create_error_token(Lexer *lexer) {
 }
 
 static void skip_white_space(Lexer *lexer) {
-    while(isspace(lexer_peek(lexer))) {
-        lexer->col++;
-        if(lexer_peek(lexer) == '\n') {
-            lexer->col = 0;
-            lexer->line++;
+    while (true) {
+        while (isspace(lexer_peek(lexer))) {
+            lexer_advance(lexer);
         }
-        lexer_advance(lexer);
+
+        // comentário de linha
+        if (lexer_peek(lexer) == '/' && lexer_peek_next(lexer) == '/') {
+            while (!lexer_is_at_end(lexer) && lexer_peek(lexer) != '\n')
+                lexer_advance(lexer);
+            continue;
+        }
+
+        // comentário de bloco
+        if (lexer_peek(lexer) == '/' && lexer_peek_next(lexer) == '*') {
+            lexer_advance(lexer); // /
+            lexer_advance(lexer); // *
+            while (!lexer_is_at_end(lexer)) {
+                if (lexer_peek(lexer) == '*' && lexer_peek_next(lexer) == '/') {
+                    lexer_advance(lexer); // *
+                    lexer_advance(lexer); // /
+                    break;
+                }
+                lexer_advance(lexer);
+            }
+            continue;
+        }
+
+        break;
     }
 }
 
@@ -165,13 +180,13 @@ static Token lexer_number(Lexer *lexer) {
         );
 }
 
-static TokenType check_keyword(const StringView view) {
+static TokenType check_keyword(Lexer *lexer, const StringView view) {
     if(view.len > 63) return TOKEN_IDENT;
     
     char rep[64] = {0};
     memcpy(rep, view.data, view.len);
 
-    TokenType *type = hashmap_get(&keyword_map, rep);
+    TokenType *type = hashmap_get(&lexer->keyword_map, rep);
     return type == NULL ? TOKEN_IDENT : *type;
 }
 
@@ -181,7 +196,7 @@ static Token lexer_ident(Lexer *lexer) {
     size_t col = lexer->col;
     while(is_alphanumeric(lexer_peek(lexer))) lexer_advance(lexer);
     const StringView view = string_view_create(&lexer->source[pos], lexer->pos - pos);
-    TokenType type = check_keyword(view);
+    TokenType type = check_keyword(lexer, view);
     return create_token(type, view, line, col);
 }
 
@@ -198,6 +213,7 @@ static Token lexer_triple_char_op(Lexer *lexer) {
         const TokenType type = op[i].type;
         const char *lexer_curr = &lexer->source[lexer->pos];
         if(!strncmp(operator, lexer_curr, strlen(operator))) {
+            lexer->pos += strlen(operator);
             return create_token(type, string_view_create(lexer_curr, strlen(operator)), lexer->line, lexer->col);
         }
     }
@@ -226,36 +242,64 @@ static Token lexer_double_char_op(Lexer *lexer) {
         TokenType type = op[i].type;
         const char *lexer_curr = &lexer->source[lexer->pos];
         if(!strncmp(operator, lexer_curr, strlen(operator))) {
+            lexer->pos += strlen(operator);
             return create_token(type, string_view_create(lexer_curr, strlen(operator)), lexer->line, lexer->col);
         }
     }
     return make_undefine_token();
 }
 static Token lexer_single_char_op(Lexer *lexer) {
-    fprintf(stderr, "%s:%s:%d: Unimplemented\n", __FILE__, __func__, __LINE__);
-    exit(1);
     struct {
         const char *op;
         TokenType type;
     } op[] = {
-        {"="},
-        {"."},
-        {"*"},
-        {"+"},
-        {"/"},
-        {"%"},
-        {"<"},
-        {">"},
+        {"=", TOKEN_EQ},
+        {".", TOKEN_DOT},
+        {"*", TOKEN_STAR},
+        {"+", TOKEN_PLUS},
+        {"/", TOKEN_SLASH},
+        {"%", TOKEN_MOD},
+        {"<", TOKEN_LESS},
+        {">", TOKEN_GREATER},
+        {"{", TOKEN_LBRACE},
+        {"}", TOKEN_RBRACE},
+        {";", TOKEN_SEMICOLON},
+        {":", TOKEN_COLON},
+        {",", TOKEN_COMMA},
+        {"(", TOKEN_LPAREN},
+        {")", TOKEN_RPAREN},
+        {"[", TOKEN_LBRACKET},
+        {"]", TOKEN_RBRACKET},
+        {"!", TOKEN_BANG},
+        {"@", TOKEN_AT}
     };
     for(size_t i = 0; i < ARR_LEN(op); i++) {
         const char *operator = op[i].op;
         const TokenType type = op[i].type;
         const char *lexer_curr = &lexer->source[lexer->pos];
         if(!strncmp(operator, lexer_curr, strlen(operator))) {
+            lexer->pos += strlen(operator);
             return create_token(type, string_view_create(lexer_curr, strlen(operator)), lexer->line, lexer->col);
         }
     }
     return make_undefine_token();
+}
+
+static Token lexer_string(Lexer *lexer) {
+    size_t pos = lexer->pos;
+    size_t line = lexer->line;
+    size_t col = lexer->col;
+    lexer_advance(lexer);
+    while(lexer_peek(lexer) != '"') {
+        if(lexer_is_at_end(lexer)) {
+            fprintf(stderr, "Unterminated string.\n");
+            exit(1);
+        }
+        char c = lexer_advance(lexer);
+        if(c == '\\' && lexer_peek(lexer) == '"') lexer_advance(lexer);
+    }
+    lexer_advance(lexer);
+    return create_token(TOKEN_STRING_LIT, string_view_create(&lexer->source[pos + 1], lexer->pos - pos - 2), line, col);
 }
 
 static Token lexer_next_token(Lexer *lexer) {
@@ -271,6 +315,9 @@ static Token lexer_next_token(Lexer *lexer) {
     char c = lexer_peek(lexer);
     if(is_digit(c)) {
         return lexer_number(lexer);
+    }
+    if(c == '"') {
+        return lexer_string(lexer);
     }
     
     if(is_alpha(c)) {
@@ -295,11 +342,11 @@ void lexer_init(Lexer *lexer, const char *source, Arena *arena) {
     lexer->pos = 0;
     lexer->col = 1;
     lexer->line = 1;
+    keyword_map_init(&lexer->keyword_map, arena);
 }
 
 TokenVec lexer_get_tokens(Lexer *lexer) {
     if(!lexer) return (TokenVec) {0};
-    keyword_map_init(&keyword_map, lexer->arena);
     TokenVec tokens = TokenVec_create(lexer->arena, 128);
     while(!lexer_is_at_end(lexer)) {
         Token token = lexer_next_token(lexer);
@@ -308,6 +355,5 @@ TokenVec lexer_get_tokens(Lexer *lexer) {
             break;
         }
     }
-    keyword_map_deinit(&keyword_map);
     return tokens;
 }

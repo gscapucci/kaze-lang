@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define VERSION "0.0.1"
+
 typedef struct CompilerOpt CompilerOpt; 
 
 enum Opt: uint64_t {
@@ -30,7 +32,7 @@ struct CompilerOpt {
 
 
 void print_compiler_help();
-
+void print_version();
 void parse_opts(CompilerOpt *result, const int argc, const char **argv);
 
 #endif /* COMPILER_OPT_H */

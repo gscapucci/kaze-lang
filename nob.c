@@ -108,6 +108,19 @@ int main(int argc, char **argv) {
             system("rm -rf ./build");
             return 0;
         }
+        
+    }
+    if(argc == 3) {
+        const char *arg = argv[1];
+        const char *input = argv[2];
+        if(!strcmp(arg, "run")) {
+            int ret = build();
+            if(ret != 0) return ret;
+            Nob_Cmd cmd = {0};
+            nob_cmd_append(&cmd, "./build/kazec", "--dump-tokens", input);
+            if(!nob_cmd_run(&cmd)) return 1;
+            return 0;
+        }
     }
     return help();
 }

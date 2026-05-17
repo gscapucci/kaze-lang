@@ -11,6 +11,7 @@ static size_t hash_string(const char * s) {
 }
 
 HashMap hashmap_create(Arena *arena, size_t initial_size) {
+    initial_size = initial_size < 32 ? 32 : initial_size;
     HashMap map;
     map.arena = arena;
     map.count = 0;

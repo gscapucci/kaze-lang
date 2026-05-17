@@ -3,6 +3,7 @@
 
 #include "../../utils/include/arena.h"
 #include "../../utils/include/gvector.h"
+#include "../../utils/include/hashmap.h"
 #include "token.h"
 
 #include <stddef.h>
@@ -19,6 +20,8 @@ struct Lexer {
     size_t pos;
     size_t col;
     size_t line;
+
+    HashMap keyword_map;
     ErrorVec errors;
 };
 

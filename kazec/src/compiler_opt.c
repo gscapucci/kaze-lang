@@ -3,7 +3,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-
+static inline bool ends_with_kz(const char *s) {
+    size_t slen = strlen(s);
+    if (slen < 4) return false;  // mínimo: "x.kz"
+    return strcmp(s + slen - 3, ".kz") == 0;
+}
 
 void parse_opts(CompilerOpt *opt, const int argc, const char **argv) {
     if(!opt) return;
@@ -42,7 +46,7 @@ void parse_opts(CompilerOpt *opt, const int argc, const char **argv) {
             opt_set(&opt->opts, OPT_DUMP_C);
             continue;
         }
-        if(!strcmp(argv[i] + strlen(argv[i]) - strlen(".kz"), ".kz")) {
+        if(ends_with_kz(argv[i])) {
             if(opt->input_file != NULL) {
                 fprintf(stderr, "Expected only one input file");
                 exit(1);
@@ -51,7 +55,7 @@ void parse_opts(CompilerOpt *opt, const int argc, const char **argv) {
             continue;
         }
     }
-    if(opt->input_file == NULL) {
+    if (opt->input_file == NULL && !opt_has(&opt->opts, OPT_PRINT_HELP) && !opt_has(&opt->opts, OPT_PRINT_VERSION)) {
         fprintf(stderr, "Expected input file");
         exit(1);
     }
@@ -111,4 +115,9 @@ void print_compiler_help() {
 //     printf("  NG_PATH         Additional module search paths\n");
 //     printf("  NG_C_COMPILER   C compiler to use (default: gcc)\n");
 //     printf("  NG_CFLAGS       Extra flags for C compiler\n");
+}
+
+
+void print_version() {
+    printf("%s", VERSION);
 }
