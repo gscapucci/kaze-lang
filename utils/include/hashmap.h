@@ -1,8 +1,8 @@
 #ifndef HASHMAP_H
 #define HASHMAP_H
 
-#include "../../kazec/include/token.h"
 #include "arena.h"
+#include <stdbool.h>
 
 typedef struct HashMapEntry HashMapEntry;
 typedef struct HashMap HashMap;

@@ -47,21 +47,47 @@ kazec/          — the compiler
   src/
     compiler_opt.c  — CLI argument parsing, CompilerOpt struct, flag bitmask (OPT_*)
     compiler.c      — top-level compile(): reads file → lexer → (parser stub)
-    lexer.c         — tokenizer, produces TokenVec
+    lexer.c         — tokenizer, produces TokenVec + ErrorVec
     token.c         — Token/TokenType definitions
+    ast.c           — AST node allocation, printing, cast helpers
   include/      — headers mirroring src/
+test/           — test suite
+  test.h/test.c — framework: TestSuite, TestCase, ASSERT macro
+  main.c        — registers and runs all suites
+  utils/        — hashmap tests
+  kazec/        — lexer and AST tests
 ```
 
-**Data flow (current):** source file → `read_file()` → `lexer_init()` + `lexer_get_tokens()` → `TokenVec`. Parser is stubbed out (commented in `compiler.c`).
+**Data flow (current):** source file → `read_file()` → `lexer_init()` + `lexer_get_tokens()` → `TokenVec`. Parser is stubbed out (commented in `compiler.c`). AST types are fully defined but not yet populated by a parser.
 
 **Memory:** everything allocates through an `Arena *` passed down from `compile()`. The arena is freed at the end of compilation. Vectors (`TokenVec`, `ErrorVec`) use `gvector.h` macros (`VECTOR_DEFINITION` / `VECTOR_IMPLEMENTATION`) backed by the arena's reallocable allocator.
 
 **Keyword lookup:** the lexer builds a `HashMap` at init time mapping keyword strings → `TokenType`. The map is arena-allocated.
 
+## AST
+
+All node types are defined in `kazec/include/ast.h`. Every concrete node embeds `Node` as its first field (C "inheritance" via pointer casting). `ast_alloc_node(arena, kind, loc)` allocates a zeroed node of the correct size for the given `NodeKind`.
+
+Cast macros:
+- `NODE_CAST(node, type, expected_kind)` — returns `NULL` if kind mismatches
+- `NODE_CAST_ANY(node, type, k1, k2, ...)` — accepts multiple valid kinds
+- `NODE_IS(node, k)` — kind predicate
+- `NODE_CAST_UNSAFE(node, type)` — unchecked, only when kind is already known
+
+Node categories: expressions (14), statements (10), declarations (5), types (5), patterns (3). The `Program` struct is the module root; it holds `Node **decls`.
+
+## Tests
+
+```bash
+./nob test   # build and run all suites
+```
+
+Three suites: `HashMap`, `Lexer`, `AST`. Each test function returns `bool`; the framework counts passes/failures per suite. To add a new suite: implement `TestSuite foo_suite(void)` and register it in `test/main.c`.
+
 ## Utils Library
 
 - `arena.h/c` — bump allocator with block chaining; supports `arena_alloc_reallocable` + `arena_realloc` for growable buffers
-- `hashmap.h/c` — string-keyed hash map, arena-backed
+- `hashmap.h/c` — string-keyed hash map, arena-backed; iterate with `hashmap_iter` + `hashmap_next`
 - `string_view.h/c` — non-owning `StringView { const char *data; size_t len; }`
 - `gvector.h` — macro-generated typed vectors (`VECTOR_DEFINITION(T, Prefix)` in header, `VECTOR_IMPLEMENTATION(T, Prefix)` in one `.c` file)
 

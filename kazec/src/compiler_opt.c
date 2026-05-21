@@ -106,10 +106,10 @@ void print_compiler_help() {
     // printf("  -m64                Generate 64-bit code\n");
     
     printf("\nExamples:\n");
-    printf("  ./kazec main.ng\n");
-    printf("  ./kazec -o myprogram main.ng\n");
-    printf("  ./kazec -c -O2 main.ng\n");
-    printf("  ./kazec -I./include -DDEBUG main.ng\n");
+    printf("  ./kazec main.kz\n");
+    printf("  ./kazec -o myprogram main.kz\n");
+    printf("  ./kazec -c -O2 main.kz\n");
+    printf("  ./kazec -I./include -DDEBUG main.kz\n");
     
 //     printf("\nEnvironment variables:\n");
 //     printf("  NG_PATH         Additional module search paths\n");

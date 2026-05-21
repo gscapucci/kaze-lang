@@ -163,8 +163,9 @@ static Token lexer_number(Lexer *lexer) {
     while(is_digit(lexer_peek(lexer))) lexer_advance(lexer);
 
     if(lexer_peek(lexer) == '.') {
+        is_float = true;
         lexer_advance(lexer);
-        
+
         if(!is_digit(lexer_peek(lexer))) {
             lexer_emit_error(lexer, "expected digit after decimal point");
             return create_error_token(lexer);
@@ -211,9 +212,12 @@ static Token lexer_triple_char_op(Lexer *lexer) {
         const char *operator = op[i].op;
         const TokenType type = op[i].type;
         const char *lexer_curr = &lexer->source[lexer->pos];
-        if(!strncmp(operator, lexer_curr, strlen(operator))) {
-            lexer->pos += strlen(operator);
-            return create_token(type, string_view_create(lexer_curr, strlen(operator)), lexer->line, lexer->col);
+        size_t op_len = strlen(operator);
+        if(!strncmp(operator, lexer_curr, op_len)) {
+            size_t line = lexer->line;
+            size_t col  = lexer->col;
+            for(size_t j = 0; j < op_len; j++) lexer_advance(lexer);
+            return create_token(type, string_view_create(lexer_curr, op_len), line, col);
         }
     }
     return make_undefine_token();
@@ -240,9 +244,12 @@ static Token lexer_double_char_op(Lexer *lexer) {
         const char *operator = op[i].op;
         TokenType type = op[i].type;
         const char *lexer_curr = &lexer->source[lexer->pos];
-        if(!strncmp(operator, lexer_curr, strlen(operator))) {
-            lexer->pos += strlen(operator);
-            return create_token(type, string_view_create(lexer_curr, strlen(operator)), lexer->line, lexer->col);
+        size_t op_len = strlen(operator);
+        if(!strncmp(operator, lexer_curr, op_len)) {
+            size_t line = lexer->line;
+            size_t col  = lexer->col;
+            for(size_t j = 0; j < op_len; j++) lexer_advance(lexer);
+            return create_token(type, string_view_create(lexer_curr, op_len), line, col);
         }
     }
     return make_undefine_token();
@@ -256,6 +263,7 @@ static Token lexer_single_char_op(Lexer *lexer) {
         {".", TOKEN_DOT},
         {"*", TOKEN_STAR},
         {"+", TOKEN_PLUS},
+        {"-", TOKEN_MINUS},
         {"/", TOKEN_SLASH},
         {"%", TOKEN_MOD},
         {"<", TOKEN_LESS},
@@ -276,9 +284,12 @@ static Token lexer_single_char_op(Lexer *lexer) {
         const char *operator = op[i].op;
         const TokenType type = op[i].type;
         const char *lexer_curr = &lexer->source[lexer->pos];
-        if(!strncmp(operator, lexer_curr, strlen(operator))) {
-            lexer->pos += strlen(operator);
-            return create_token(type, string_view_create(lexer_curr, strlen(operator)), lexer->line, lexer->col);
+        size_t op_len = strlen(operator);
+        if(!strncmp(operator, lexer_curr, op_len)) {
+            size_t line = lexer->line;
+            size_t col  = lexer->col;
+            for(size_t j = 0; j < op_len; j++) lexer_advance(lexer);
+            return create_token(type, string_view_create(lexer_curr, op_len), line, col);
         }
     }
     return make_undefine_token();
@@ -291,8 +302,8 @@ static Token lexer_string(Lexer *lexer) {
     lexer_advance(lexer);
     while(lexer_peek(lexer) != '"') {
         if(lexer_is_at_end(lexer)) {
-            fprintf(stderr, "Unterminated string.\n");
-            exit(1);
+            lexer_emit_error(lexer, "unterminated string literal");
+            return create_error_token(lexer);
         }
         char c = lexer_advance(lexer);
         if(c == '\\' && lexer_peek(lexer) == '"') lexer_advance(lexer);
@@ -342,6 +353,7 @@ void lexer_init(Lexer *lexer, const char *source, Arena *arena) {
     lexer->col = 1;
     lexer->line = 1;
     keyword_map_init(&lexer->keyword_map, arena);
+    lexer->errors = ErrorVec_create(arena, 8);
 }
 
 TokenVec lexer_get_tokens(Lexer *lexer) {

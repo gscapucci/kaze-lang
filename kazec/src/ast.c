@@ -1,4 +1,5 @@
 #include "../include/ast.h"
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -56,6 +57,7 @@ static const size_t node_sizes[NODE_KIND_COUNT] = {
 // ============================================================================
 
 Node *ast_alloc_node(Arena *arena, NodeKind kind, SourceLoc loc) {
+    assert(kind < NODE_KIND_COUNT);
     size_t size = node_sizes[kind];
     Node *node = (Node *)arena_alloc_zeroed(arena, size);
     node->kind = kind;
