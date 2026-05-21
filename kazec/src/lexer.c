@@ -40,7 +40,6 @@ static void keyword_map_init(HashMap *map, Arena *arena) {
         {"return", TOKEN_RETURN},
         {"union", TOKEN_UNION},
     };
-
     
     *map = hashmap_create(arena, 0);
     for(size_t i = 0; i < ARR_LEN(keywords_kv); i++) {

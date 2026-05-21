@@ -66,12 +66,70 @@ static int link_kazec() {
     Nob_Cmd cmd = {0};
     nob_cc(&cmd);
 
-
     append_objects_from_dir(&cmd, "./utils/build");
     append_objects_from_dir(&cmd, "./kazec/build");
 
     nob_cc_output(&cmd, "./build/kazec");
     if(!nob_cmd_run(&cmd)) return 1;
+    return 0;
+}
+
+static int build();
+
+static bool compile_c_file(const char *src, const char *obj) {
+    Nob_Cmd cmd = {0};
+    nob_cc(&cmd);
+    nob_cc_flags(&cmd);
+    nob_cmd_append(&cmd, "-c");
+    nob_cc_inputs(&cmd, src);
+    nob_cc_output(&cmd, obj);
+    return nob_cmd_run(&cmd);
+}
+
+static int build_tests() {
+    int ret = build();
+    if (ret != 0) return ret;
+
+    // Compile test framework + test sources
+    const char *test_srcs[] = {
+        "./test/test.c",
+        "./test/main.c",
+        "./test/utils/hashmap_test.c",
+        "./test/kazec/lexer_test.c",
+        "./test/kazec/ast_test.c",
+    };
+    const char *test_objs[] = {
+        "./build/test_framework.o",
+        "./build/test_main.o",
+        "./build/test_hashmap.o",
+        "./build/test_lexer.o",
+        "./build/test_ast.o",
+    };
+    size_t n = sizeof(test_srcs) / sizeof(test_srcs[0]);
+    for (size_t i = 0; i < n; i++) {
+        if (!compile_c_file(test_srcs[i], test_objs[i])) return 1;
+    }
+
+    // Link: utils + kazec (excluding main.o) + test objects
+    Nob_Cmd cmd = {0};
+    nob_cc(&cmd);
+    append_objects_from_dir(&cmd, "./utils/build");
+
+    // kazec objects except main.o
+    Nob_File_Paths files = {0};
+    nob_read_entire_dir("./kazec/build", &files);
+    for (size_t i = 0; i < files.count; i++) {
+        if (!nob_sv_end_with(nob_sv_from_cstr(files.items[i]), ".o")) continue;
+        if (strcmp(files.items[i], "main.o") == 0) continue;
+        Nob_String_Builder sb = {0};
+        nob_sb_append_cstr(&sb, "./kazec/build/");
+        nob_sb_append_cstr(&sb, files.items[i]);
+        nob_cmd_append(&cmd, nob_temp_sv_to_cstr(nob_sb_to_sv(sb)));
+    }
+
+    for (size_t i = 0; i < n; i++) nob_cmd_append(&cmd, test_objs[i]);
+    nob_cc_output(&cmd, "./build/test");
+    if (!nob_cmd_run(&cmd)) return 1;
     return 0;
 }
 
@@ -97,7 +155,12 @@ int main(int argc, char **argv) {
     if(argc == 2) {
         const char *arg = argv[1];
         if(!strcmp(arg, "test")) {
-            // return test();
+            int tret = build_tests();
+            if(tret != 0) return tret;
+            Nob_Cmd cmd = {0};
+            nob_cmd_append(&cmd, "./build/test");
+            if(!nob_cmd_run(&cmd)) return 1;
+            return 0;
         }
         if(!strcmp(arg, "build")) {
             return build();

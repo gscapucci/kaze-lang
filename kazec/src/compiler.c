@@ -58,13 +58,13 @@ int compile(CompilerOpt *opt) {
     lexer_init(&lexer, input_file, arena);
     
     TokenVec tokens = lexer_get_tokens(&lexer);
-    if(lexer.errors.len > 0) {
-        for(size_t i = 0; i < 0; i++) {
-            fprintf(stderr, "Error: %s\n", ErrorVec_get(&lexer.errors, i));
-        }
-        arena_delete(arena);
-        return 1;
-    }
+    // if(lexer.errors.len > 0) {
+    //     for(size_t i = 0; i < lexer.errors.len; i++) {
+    //         fprintf(stderr, "Error: %s\n", ErrorVec_get(&lexer.errors, i));
+    //     }
+    //     arena_delete(arena);
+    //     return 1;
+    // }
     if(opt_has(&opt->opts, OPT_DUMP_TOKENS)) {
         for(size_t i = 0; i < tokens.len; i++) {
             Token token = TokenVec_get(&tokens, i);

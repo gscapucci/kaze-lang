@@ -83,11 +83,10 @@ HashMapIter hashmap_iter(HashMap* map) {
 }
 
 bool hashmap_next(HashMapIter* iter, const char** key, void** value) {
-    if(iter->current == NULL && iter->bucket_index == iter->map->size) return false;
-    if(iter->current == NULL) {
+    while (iter->current == NULL) {
         iter->bucket_index++;
+        if (iter->bucket_index >= iter->map->size) return false;
         iter->current = iter->map->buckets[iter->bucket_index];
-        return hashmap_next(iter, key, value);
     }
     *key = iter->current->key;
     *value = iter->current->value;
