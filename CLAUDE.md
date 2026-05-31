@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Kaze is a systems programming language compiler written in C. The compiler (`kazec`) currently targets C code generation. The formal grammar is in `grammar.ebnf`, example syntax is in `test.kz`, and design notes are in `langspec.md`.
 
+**Primary goal:** a single Kaze program must run **identically across Desktop, Web, and Android.** "Write once, run the same everywhere" is the north star — language, semantics, and standard library are designed to behave consistently on all three targets, and every design decision should be weighed against this portability guarantee. (C codegen is the first backend; Web/Android targeting follows from it.)
+
 ## Build System
 
 The project uses [nob](https://github.com/tsoding/nob.h) — a single-header C build system. The root `nob.c` orchestrates sub-builds in `utils/` and `kazec/`, then links everything into `./build/kazec`.
