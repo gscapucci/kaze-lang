@@ -46,6 +46,10 @@ void parse_opts(CompilerOpt *opt, const int argc, const char **argv) {
             opt_set(&opt->opts, OPT_DUMP_C);
             continue;
         }
+        if(!strcmp(argv[i], "--dump-types")) {
+            opt_set(&opt->opts, OPT_DUMP_TYPES);
+            continue;
+        }
         if(ends_with_kz(argv[i])) {
             if(opt->input_file != NULL) {
                 fprintf(stderr, "Expected only one input file");
@@ -73,6 +77,7 @@ void print_compiler_help() {
     // printf("  -c                  Compile to object file only\n");
     printf("  --dump-ast                    Dump AST and exit\n");
     printf("  --dump-tokens                 Dump token list and exit\n");
+    printf("  --dump-types                  Type-check and dump resolved types\n");
     printf("  --dump-c                      Dump C code generated\n");
     // printf("  --verbose           Verbose output during compilation\n");
     

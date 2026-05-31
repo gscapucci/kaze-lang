@@ -1,0 +1,14 @@
+// 010 — match
+// exercita todos os tipos de pattern: path, struct, tuple, literal, bind, '_'.
+
+fn classifica(msg: i32) void {
+    match msg {
+        Estado::Parado => { parar(); }
+        Ponto{ x, y } => { usar(x, y); }
+        (a, b) => { par(a, b); }
+        0 => { zero(); }
+        "fim" => { terminar(); }
+        outro => { usar(outro); }
+        _ => { ignorar(); }
+    }
+}

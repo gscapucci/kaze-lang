@@ -27,20 +27,48 @@ Adicionar:
 
 ## 2.1 Scripts de Build
 
-Scripts de build são escritos na própria linguagem.
+Scripts de build são escritos na própria linguagem, em um arquivo `build.kz`.
+
+A filosofia é deliberadamente **imperativa**: nada de objeto builder mágico, grafo de steps ou avaliação preguiçosa. O `build.kz` é um programa comum — a função `build()` é o ponto de entrada e cada comando executa imediatamente, de cima para baixo, como um shell tipado.
 
 Exemplo:
 
 ```c
-// TODO ainda a ser definido
-fn build(b: *Build) void {
-    const exe = b.executable("app");
+// build.kz
 
-    exe.add_source("src/main.kz");
+fn build() void {
+    compile("src/main.kz", out = "app", link = ["SDL3"]);
+    compile("test/main.kz", out = "tests");
+    run("tests");
+}
+```
 
-    exe.link_system_library("SDL3");
+Comandos básicos disponíveis no script:
 
-    b.install(exe);
+| Comando                              | Descrição                                      |
+| ------------------------------------ | ---------------------------------------------- |
+| `compile(src, out, link, ...)`       | Compila um ou mais fontes em um executável     |
+| `run(target, args)`                  | Executa um alvo já compilado                   |
+| `shell(cmd)`                         | Executa um comando externo do sistema          |
+| `copy(from, to)` / `mkdir(path)`     | Operações de arquivo durante o build           |
+
+Princípios:
+
+* **Ordem importa.** Os comandos rodam na sequência em que aparecem; não há grafo de dependências implícito.
+* **Sem estado oculto.** Não existe um `b` ou alvo "atual" — cada chamada é explícita e independente.
+* **É só código.** Loops, condicionais e funções normais da linguagem podem ser usados para organizar builds maiores.
+
+```c
+// build.kz — exemplo com lógica imperativa
+
+fn build() void {
+    const modules = ["core", "io", "net"];
+
+    for m in modules {
+        compile(@format("src/{}.kz", m), out = @format("{}.o", m));
+    }
+
+    compile("src/main.kz", out = "app", link = ["SDL3"]);
 }
 ```
 
@@ -169,7 +197,9 @@ Adicionar:
 
 ## 12.4 Comportamento do Panic
 
-`panic()` aborta imediatamente o processo por padrão.
+`panic` é uma **keyword** no momento (possivelmente uma função de stdlib no futuro). Não é um `@`-builtin — aborta em runtime, então fica fora da regra "`@` = comptime" da §16.
+
+`panic(msg)` aborta imediatamente o processo por padrão.
 
 Sem stack unwinding.
 
@@ -224,15 +254,28 @@ Muito útil para integração gradual.
 
 # 16. Atributos & Builtins do Compilador
 
+Regra geral: **tudo que começa com `@` é comptime.** Toda forma prefixada por `@` — builtins (`@format`, `@cimport`, `@os`, ...) e atributos (`@cdecl`, `@inline`, ...) — é resolvida e avaliada em tempo de compilação. Não existe `@`-construção que produza efeito apenas em runtime; o prefixo `@` é a marca visual de que aquilo acontece no compilador.
+
+Consequências:
+
+* Os argumentos de um builtin que precisam ser conhecidos no compile-time (ex.: a string de formato de `@format`, o caminho de `@cimport`) devem ser literais ou expressões `comptime`.
+* O resultado pode ser usado em runtime (uma string `@format` vira um valor normal), mas a *avaliação* da construção `@` ocorre antes.
+
 Adicionar:
 
-| Builtin               | Descrição                |
-| --------------------- | ------------------------ |
-| `@panic(msg)`         | Aborta a execução        |
-| `@compile_error(msg)` | Emite erro de compilação |
-| `@file()`             | Arquivo atual            |
-| `@line()`             | Linha atual              |
-| `@function()`         | Função atual             |
+| Builtin               | Descrição                            |
+| --------------------- | ------------------------------------ |
+| `@compile_error(msg)` | Emite erro de compilação             |
+| `@format(fmt, ...)`   | Formata uma string                   |
+| `@file()`             | Arquivo atual                        |
+| `@line()`             | Linha atual                          |
+| `@function()`         | Função atual                         |
+
+`@format` recebe uma string de formato **literal** (verificada em tempo de compilação) e argumentos a interpolar. A string e a aridade dos argumentos são validadas pelo compilador; um placeholder sem argumento correspondente é erro de compilação. É o mecanismo canônico para construir strings — não há overload de `+` para concatenação.
+
+```c
+const path = @format("src/{}.kz", name);   // "src/io.kz"
+```
 
 ---
 

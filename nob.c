@@ -97,6 +97,10 @@ static int build_tests() {
         "./test/utils/hashmap_test.c",
         "./test/kazec/lexer_test.c",
         "./test/kazec/ast_test.c",
+        "./test/kazec/parser_test.c",
+        "./test/kazec/type_test.c",
+        "./test/kazec/scope_test.c",
+        "./test/kazec/sema_test.c",
     };
     const char *test_objs[] = {
         "./build/test_framework.o",
@@ -104,6 +108,10 @@ static int build_tests() {
         "./build/test_hashmap.o",
         "./build/test_lexer.o",
         "./build/test_ast.o",
+        "./build/test_parser.o",
+        "./build/test_type.o",
+        "./build/test_scope.o",
+        "./build/test_sema.o",
     };
     size_t n = sizeof(test_srcs) / sizeof(test_srcs[0]);
     for (size_t i = 0; i < n; i++) {

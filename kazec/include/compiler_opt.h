@@ -13,7 +13,8 @@ enum Opt: uint64_t {
     OPT_DUMP_AST = (1 << 1),
     OPT_DUMP_C = (1 << 2),
     OPT_PRINT_HELP = (1 << 3),
-    OPT_PRINT_VERSION = (1 << 4)
+    OPT_PRINT_VERSION = (1 << 4),
+    OPT_DUMP_TYPES = (1 << 5)
 };
 
 static inline void opt_set(uint64_t *iopt, enum Opt eopt) {

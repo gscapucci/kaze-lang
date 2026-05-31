@@ -1,0 +1,39 @@
+// 009 — programa completo
+// junta imports, tipos, struct, enum e funções num módulo coeso.
+
+import "std/io" { println };
+
+const MAX: i32 = 100;
+const Ptr = *const u8;
+
+const Estado = enum { Parado, Rodando, Pausado };
+
+const Jogador = struct {
+    vida: i32,
+    nome: *const u8,
+    fn vivo(self: *Self) bool {
+        return self.vida > 0;
+    }
+};
+
+fn dano(j: *Jogador, qtd: i32) i32 {
+    var restante = j->vida - qtd;
+    if restante < 0 {
+        restante = 0;
+    }
+    return restante;
+}
+
+fn main() i32 {
+    var estado = Estado::Rodando;
+    var soma = 0;
+
+    for i in faixa {
+        soma += i * 2;
+        if soma > MAX {
+            break;
+        }
+    }
+
+    return comptime dano(jogador, 10);
+}

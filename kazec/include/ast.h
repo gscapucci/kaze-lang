@@ -25,9 +25,12 @@ typedef enum NodeKind {
     NODE_EXPR_CALL,
     NODE_EXPR_INDEX,
     NODE_EXPR_FIELD_ACCESS,
-    NODE_EXPR_ENUM_VARIANT,
+    NODE_EXPR_PATH,
     NODE_EXPR_CAST,
     NODE_EXPR_POSTFIX,
+    NODE_EXPR_CIMPORT,
+    NODE_EXPR_STRUCT_LIT,
+    NODE_EXPR_TRY,
     // Statements
     NODE_STMT_VAR_DECL,
     NODE_STMT_ASSIGNMENT,
@@ -39,10 +42,14 @@ typedef enum NodeKind {
     NODE_STMT_CONTINUE,
     NODE_STMT_BLOCK,
     NODE_STMT_EXPR,
+    NODE_STMT_MATCH,
+    NODE_STMT_DEFER,
+    NODE_STMT_WHEN,
     // Declarations
     NODE_DECL_FUNCTION,
     NODE_DECL_STRUCT,
     NODE_DECL_ENUM,
+    NODE_DECL_UNION,
     NODE_DECL_TYPE_ALIAS,
     NODE_DECL_IMPORT,
     // Types
@@ -52,7 +59,10 @@ typedef enum NodeKind {
     NODE_TYPE_FUNCTION,
     NODE_TYPE_GENERIC,
     // Patterns
+    NODE_PATTERN_WILDCARD,
     NODE_PATTERN_IDENT,
+    NODE_PATTERN_LITERAL,
+    NODE_PATTERN_PATH,
     NODE_PATTERN_TUPLE,
     NODE_PATTERN_STRUCT,
 
@@ -152,11 +162,13 @@ typedef struct {
     bool is_pointer;
 } ExprFieldAccess;
 
+// Scope resolution with "::" — e.g. Color::Red, c::strlen, ns::sub::fn.
+// `scope` is the left operand (enum/type/namespace), `name` the resolved symbol.
 typedef struct {
     Node base;
-    Node *enum_type;
-    StringView variant;
-} ExprEnumVariant;
+    Node *scope;
+    StringView name;
+} ExprPath;
 
 typedef struct {
     Node base;
@@ -169,6 +181,31 @@ typedef struct {
     Node *expr;
     StringView op;
 } ExprPostfix;
+
+// @cimport("header.h", .{ .defines = {"M", "N=1"} }) — returns a namespace
+// struct accessed with "::". `defines` holds the macro strings (may be empty).
+typedef struct {
+    Node base;
+    StringView path;
+    StringView *defines;
+    size_t define_count;
+} ExprCImport;
+
+// Struct literal:  Vec2{ .x = 1.0, .y = 2.0 }  (or anonymous .{ ... }).
+typedef struct {
+    Node base;
+    StringView type_name;     // zero-len when anonymous
+    bool is_anonymous;
+    StringView *field_names;
+    Node **field_values;
+    size_t field_count;
+} ExprStructLit;
+
+// try expr — propagates an error up the call stack.
+typedef struct {
+    Node base;
+    Node *expr;
+} ExprTry;
 
 // ============================================================================
 // Statements
@@ -234,6 +271,40 @@ typedef struct {
     Node *expr;
 } StmtExprStmt;
 
+// match subject { pattern => { ... } ... }
+typedef struct {
+    Node *pattern;
+    Node **body;
+    size_t body_len;
+} MatchArm;
+
+typedef struct {
+    Node base;
+    Node *subject;
+    MatchArm *arms;
+    size_t arm_count;
+} StmtMatch;
+
+// defer (block | expr-stmt)
+typedef struct {
+    Node base;
+    Node *body;
+} StmtDefer;
+
+// when cond { ... } else when cond { ... } else { ... }  (compile-time)
+// A branch with condition == NULL is the trailing `else`.
+typedef struct {
+    Node *condition;
+    Node **body;
+    size_t body_len;
+} WhenBranch;
+
+typedef struct {
+    Node base;
+    WhenBranch *branches;
+    size_t branch_count;
+} StmtWhen;
+
 // ============================================================================
 // Declarations
 // ============================================================================
@@ -264,21 +335,48 @@ typedef struct {
     StringView *field_names;
     Node **field_types;
     size_t field_count;
+    Node **methods;          // DeclFunction nodes declared inside the struct
+    size_t method_count;
     bool is_generic;
     StringView *generic_params;
     size_t generic_count;
 } DeclStruct;
 
+typedef enum {
+    ENUM_VARIANT_PLAIN,         // Red
+    ENUM_VARIANT_DISCRIMINANT,  // Red = 5
+    ENUM_VARIANT_TUPLE,         // Write(*const u8)
+    ENUM_VARIANT_STRUCT,        // Move{ x: i32, y: i32 }
+} EnumVariantKind;
+
+typedef struct {
+    StringView name;
+    EnumVariantKind kind;
+    Node *discriminant;         // DISCRIMINANT: the value expression
+    Node *tuple_type;           // TUPLE: the associated type
+    StringView *field_names;    // STRUCT: named fields
+    Node **field_types;
+    size_t field_count;
+} EnumVariant;
+
 typedef struct {
     Node base;
     StringView name;
-    StringView *variant_names;
-    Node **variant_data;  // NULL or associated type per variant
+    EnumVariant *variants;
     size_t variant_count;
     bool is_generic;
     StringView *generic_params;
     size_t generic_count;
 } DeclEnum;
+
+// union { as_i32: i32, as_f32: f32 }  — C-interop tagless union.
+typedef struct {
+    Node base;
+    StringView name;
+    StringView *field_names;
+    Node **field_types;
+    size_t field_count;
+} DeclUnion;
 
 typedef struct {
     Node base;
@@ -329,6 +427,30 @@ typedef struct {
     Node **type_args;
     size_t type_arg_count;
 } TypeGeneric;
+
+// ============================================================================
+// Patterns (match arms)
+// ============================================================================
+
+typedef struct { Node base; } PatternWildcard;              // _
+typedef struct { Node base; StringView name; } PatternIdent; // variable bind
+typedef struct { Node base; Node *literal; } PatternLiteral; // 1, "s", true, null
+typedef struct {
+    Node base;
+    StringView type_name;   // zero-len when just ::Variant
+    StringView variant;
+} PatternPath;                                               // Color::Red
+typedef struct {
+    Node base;
+    Node **elements;
+    size_t count;
+} PatternTuple;                                             // (a, b, _)
+typedef struct {
+    Node base;
+    StringView type_name;
+    StringView *fields;
+    size_t field_count;
+} PatternStruct;                                            // Point{ x, y }
 
 // ============================================================================
 // Program / module root

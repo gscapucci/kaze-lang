@@ -19,9 +19,12 @@ static const size_t node_sizes[NODE_KIND_COUNT] = {
     [NODE_EXPR_CALL]         = sizeof(ExprCall),
     [NODE_EXPR_INDEX]        = sizeof(ExprIndex),
     [NODE_EXPR_FIELD_ACCESS] = sizeof(ExprFieldAccess),
-    [NODE_EXPR_ENUM_VARIANT] = sizeof(ExprEnumVariant),
+    [NODE_EXPR_PATH]         = sizeof(ExprPath),
     [NODE_EXPR_CAST]         = sizeof(ExprCast),
     [NODE_EXPR_POSTFIX]      = sizeof(ExprPostfix),
+    [NODE_EXPR_CIMPORT]      = sizeof(ExprCImport),
+    [NODE_EXPR_STRUCT_LIT]   = sizeof(ExprStructLit),
+    [NODE_EXPR_TRY]          = sizeof(ExprTry),
 
     [NODE_STMT_VAR_DECL]     = sizeof(StmtVarDecl),
     [NODE_STMT_ASSIGNMENT]   = sizeof(StmtAssignment),
@@ -33,10 +36,14 @@ static const size_t node_sizes[NODE_KIND_COUNT] = {
     [NODE_STMT_CONTINUE]     = sizeof(StmtBreakContinue),
     [NODE_STMT_BLOCK]        = sizeof(StmtBlock),
     [NODE_STMT_EXPR]         = sizeof(StmtExprStmt),
+    [NODE_STMT_MATCH]        = sizeof(StmtMatch),
+    [NODE_STMT_DEFER]        = sizeof(StmtDefer),
+    [NODE_STMT_WHEN]         = sizeof(StmtWhen),
 
     [NODE_DECL_FUNCTION]     = sizeof(DeclFunction),
     [NODE_DECL_STRUCT]       = sizeof(DeclStruct),
     [NODE_DECL_ENUM]         = sizeof(DeclEnum),
+    [NODE_DECL_UNION]        = sizeof(DeclUnion),
     [NODE_DECL_TYPE_ALIAS]   = sizeof(DeclTypeAlias),
     [NODE_DECL_IMPORT]       = sizeof(DeclImport),
 
@@ -46,10 +53,12 @@ static const size_t node_sizes[NODE_KIND_COUNT] = {
     [NODE_TYPE_FUNCTION]     = sizeof(TypeFunction),
     [NODE_TYPE_GENERIC]      = sizeof(TypeGeneric),
 
-    // Patterns share Node for now (no extra fields yet)
-    [NODE_PATTERN_IDENT]     = sizeof(Node),
-    [NODE_PATTERN_TUPLE]     = sizeof(Node),
-    [NODE_PATTERN_STRUCT]    = sizeof(Node),
+    [NODE_PATTERN_WILDCARD]  = sizeof(PatternWildcard),
+    [NODE_PATTERN_IDENT]     = sizeof(PatternIdent),
+    [NODE_PATTERN_LITERAL]   = sizeof(PatternLiteral),
+    [NODE_PATTERN_PATH]      = sizeof(PatternPath),
+    [NODE_PATTERN_TUPLE]     = sizeof(PatternTuple),
+    [NODE_PATTERN_STRUCT]    = sizeof(PatternStruct),
 };
 
 // ============================================================================
@@ -94,9 +103,12 @@ const char *node_kind_to_string(NodeKind kind) {
         case NODE_EXPR_CALL:         return "ExprCall";
         case NODE_EXPR_INDEX:        return "ExprIndex";
         case NODE_EXPR_FIELD_ACCESS: return "ExprFieldAccess";
-        case NODE_EXPR_ENUM_VARIANT: return "ExprEnumVariant";
+        case NODE_EXPR_PATH:         return "ExprPath";
         case NODE_EXPR_CAST:         return "ExprCast";
         case NODE_EXPR_POSTFIX:      return "ExprPostfix";
+        case NODE_EXPR_CIMPORT:      return "ExprCImport";
+        case NODE_EXPR_STRUCT_LIT:   return "ExprStructLit";
+        case NODE_EXPR_TRY:          return "ExprTry";
         case NODE_STMT_VAR_DECL:     return "StmtVarDecl";
         case NODE_STMT_ASSIGNMENT:   return "StmtAssignment";
         case NODE_STMT_IF:           return "StmtIf";
@@ -107,9 +119,13 @@ const char *node_kind_to_string(NodeKind kind) {
         case NODE_STMT_CONTINUE:     return "StmtContinue";
         case NODE_STMT_BLOCK:        return "StmtBlock";
         case NODE_STMT_EXPR:         return "StmtExprStmt";
+        case NODE_STMT_MATCH:        return "StmtMatch";
+        case NODE_STMT_DEFER:        return "StmtDefer";
+        case NODE_STMT_WHEN:         return "StmtWhen";
         case NODE_DECL_FUNCTION:     return "DeclFunction";
         case NODE_DECL_STRUCT:       return "DeclStruct";
         case NODE_DECL_ENUM:         return "DeclEnum";
+        case NODE_DECL_UNION:        return "DeclUnion";
         case NODE_DECL_TYPE_ALIAS:   return "DeclTypeAlias";
         case NODE_DECL_IMPORT:       return "DeclImport";
         case NODE_TYPE_PRIMITIVE:    return "TypePrimitive";
@@ -117,7 +133,10 @@ const char *node_kind_to_string(NodeKind kind) {
         case NODE_TYPE_ARRAY:        return "TypeArray";
         case NODE_TYPE_FUNCTION:     return "TypeFunction";
         case NODE_TYPE_GENERIC:      return "TypeGeneric";
+        case NODE_PATTERN_WILDCARD:  return "PatternWildcard";
         case NODE_PATTERN_IDENT:     return "PatternIdent";
+        case NODE_PATTERN_LITERAL:   return "PatternLiteral";
+        case NODE_PATTERN_PATH:      return "PatternPath";
         case NODE_PATTERN_TUPLE:     return "PatternTuple";
         case NODE_PATTERN_STRUCT:    return "PatternStruct";
         default:                     return "<unknown>";
@@ -215,12 +234,12 @@ void ast_print_tree(Node *root, int depth) {
             ast_print_tree(n->object, depth + 1);
             break;
         }
-        case NODE_EXPR_ENUM_VARIANT: {
-            ExprEnumVariant *n = NODE_CAST_UNSAFE(root, ExprEnumVariant);
-            printf(" variant=");
-            print_sv(n->variant);
+        case NODE_EXPR_PATH: {
+            ExprPath *n = NODE_CAST_UNSAFE(root, ExprPath);
+            printf(" name=");
+            print_sv(n->name);
             printf("\n");
-            ast_print_tree(n->enum_type, depth + 1);
+            ast_print_tree(n->scope, depth + 1);
             break;
         }
         case NODE_EXPR_CAST: {
@@ -234,6 +253,39 @@ void ast_print_tree(Node *root, int depth) {
             ExprPostfix *n = NODE_CAST_UNSAFE(root, ExprPostfix);
             printf(" op=");
             print_sv(n->op);
+            printf("\n");
+            ast_print_tree(n->expr, depth + 1);
+            break;
+        }
+        case NODE_EXPR_CIMPORT: {
+            ExprCImport *n = NODE_CAST_UNSAFE(root, ExprCImport);
+            printf(" @cimport \"");
+            print_sv(n->path);
+            printf("\"\n");
+            for (size_t i = 0; i < n->define_count; i++) {
+                print_indent(depth + 1);
+                printf("define: \"");
+                print_sv(n->defines[i]);
+                printf("\"\n");
+            }
+            break;
+        }
+        case NODE_EXPR_STRUCT_LIT: {
+            ExprStructLit *n = NODE_CAST_UNSAFE(root, ExprStructLit);
+            printf(" ");
+            if (n->is_anonymous) printf(".{ }"); else print_sv(n->type_name);
+            printf("\n");
+            for (size_t i = 0; i < n->field_count; i++) {
+                print_indent(depth + 1);
+                printf(".");
+                print_sv(n->field_names[i]);
+                printf(" =\n");
+                ast_print_tree(n->field_values[i], depth + 2);
+            }
+            break;
+        }
+        case NODE_EXPR_TRY: {
+            ExprTry *n = NODE_CAST_UNSAFE(root, ExprTry);
             printf("\n");
             ast_print_tree(n->expr, depth + 1);
             break;
@@ -350,6 +402,8 @@ void ast_print_tree(Node *root, int depth) {
                 printf("\n");
                 ast_print_tree(n->field_types[i], depth + 2);
             }
+            for (size_t i = 0; i < n->method_count; i++)
+                ast_print_tree(n->methods[i], depth + 1);
             break;
         }
         case NODE_DECL_ENUM: {
@@ -358,12 +412,38 @@ void ast_print_tree(Node *root, int depth) {
             print_sv(n->name);
             printf("\n");
             for (size_t i = 0; i < n->variant_count; i++) {
+                EnumVariant *v = &n->variants[i];
                 print_indent(depth + 1);
                 printf("variant: ");
-                print_sv(n->variant_names[i]);
+                print_sv(v->name);
                 printf("\n");
-                if (n->variant_data && n->variant_data[i])
-                    ast_print_tree(n->variant_data[i], depth + 2);
+                if (v->kind == ENUM_VARIANT_DISCRIMINANT) {
+                    ast_print_tree(v->discriminant, depth + 2);
+                } else if (v->kind == ENUM_VARIANT_TUPLE) {
+                    ast_print_tree(v->tuple_type, depth + 2);
+                } else if (v->kind == ENUM_VARIANT_STRUCT) {
+                    for (size_t j = 0; j < v->field_count; j++) {
+                        print_indent(depth + 2);
+                        printf("field: ");
+                        print_sv(v->field_names[j]);
+                        printf("\n");
+                        ast_print_tree(v->field_types[j], depth + 3);
+                    }
+                }
+            }
+            break;
+        }
+        case NODE_DECL_UNION: {
+            DeclUnion *n = NODE_CAST_UNSAFE(root, DeclUnion);
+            printf(" union ");
+            print_sv(n->name);
+            printf("\n");
+            for (size_t i = 0; i < n->field_count; i++) {
+                print_indent(depth + 1);
+                printf("field: ");
+                print_sv(n->field_names[i]);
+                printf("\n");
+                ast_print_tree(n->field_types[i], depth + 2);
             }
             break;
         }
@@ -417,6 +497,81 @@ void ast_print_tree(Node *root, int depth) {
             printf("\n");
             for (size_t i = 0; i < n->type_arg_count; i++)
                 ast_print_tree(n->type_args[i], depth + 1);
+            break;
+        }
+        case NODE_STMT_MATCH: {
+            StmtMatch *n = NODE_CAST_UNSAFE(root, StmtMatch);
+            printf("\n");
+            ast_print_tree(n->subject, depth + 1);
+            for (size_t i = 0; i < n->arm_count; i++) {
+                print_indent(depth + 1); printf("arm:\n");
+                ast_print_tree(n->arms[i].pattern, depth + 2);
+                for (size_t j = 0; j < n->arms[i].body_len; j++)
+                    ast_print_tree(n->arms[i].body[j], depth + 2);
+            }
+            break;
+        }
+        case NODE_STMT_DEFER: {
+            StmtDefer *n = NODE_CAST_UNSAFE(root, StmtDefer);
+            printf("\n");
+            ast_print_tree(n->body, depth + 1);
+            break;
+        }
+        case NODE_STMT_WHEN: {
+            StmtWhen *n = NODE_CAST_UNSAFE(root, StmtWhen);
+            printf("\n");
+            for (size_t i = 0; i < n->branch_count; i++) {
+                print_indent(depth + 1);
+                printf(n->branches[i].condition ? "when:\n" : "else:\n");
+                if (n->branches[i].condition)
+                    ast_print_tree(n->branches[i].condition, depth + 2);
+                for (size_t j = 0; j < n->branches[i].body_len; j++)
+                    ast_print_tree(n->branches[i].body[j], depth + 2);
+            }
+            break;
+        }
+        case NODE_PATTERN_WILDCARD:
+            printf(" _\n");
+            break;
+        case NODE_PATTERN_IDENT: {
+            PatternIdent *n = NODE_CAST_UNSAFE(root, PatternIdent);
+            printf(" ");
+            print_sv(n->name);
+            printf("\n");
+            break;
+        }
+        case NODE_PATTERN_LITERAL: {
+            PatternLiteral *n = NODE_CAST_UNSAFE(root, PatternLiteral);
+            printf("\n");
+            ast_print_tree(n->literal, depth + 1);
+            break;
+        }
+        case NODE_PATTERN_PATH: {
+            PatternPath *n = NODE_CAST_UNSAFE(root, PatternPath);
+            printf(" ");
+            print_sv(n->type_name);
+            printf("::");
+            print_sv(n->variant);
+            printf("\n");
+            break;
+        }
+        case NODE_PATTERN_TUPLE: {
+            PatternTuple *n = NODE_CAST_UNSAFE(root, PatternTuple);
+            printf("\n");
+            for (size_t i = 0; i < n->count; i++)
+                ast_print_tree(n->elements[i], depth + 1);
+            break;
+        }
+        case NODE_PATTERN_STRUCT: {
+            PatternStruct *n = NODE_CAST_UNSAFE(root, PatternStruct);
+            printf(" ");
+            print_sv(n->type_name);
+            printf("\n");
+            for (size_t i = 0; i < n->field_count; i++) {
+                print_indent(depth + 1);
+                print_sv(n->fields[i]);
+                printf("\n");
+            }
             break;
         }
         default:

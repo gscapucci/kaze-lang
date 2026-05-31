@@ -1,0 +1,10 @@
+// 013 — tratamento de erros: try (propaga) e unwrap '!'.
+// `catch` não é mais palavra-chave — é uma função da stdlib (estilo Rust).
+
+fn processa() void {
+    const a = try parse(entrada);
+    const b = catch(parse(entrada), 0);
+    const c = catch(parse(entrada), padrao(err));
+    const d = parse(entrada)!;
+    defer fecha(arquivo);
+}

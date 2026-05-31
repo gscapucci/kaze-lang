@@ -1,0 +1,15 @@
+// 005 — structs
+// campos e métodos (o método é parseado; ainda não é armazenado no DeclStruct).
+
+const Vec2 = struct {
+    x: f32,
+    y: f32,
+    fn comprimento(self: *Self) f32 {
+        return self.x;
+    }
+};
+
+const Nodo = struct {
+    valor: i32,
+    proximo: *Nodo,
+};

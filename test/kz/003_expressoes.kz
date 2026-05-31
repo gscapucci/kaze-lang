@@ -1,0 +1,18 @@
+// 003 — expressões
+// precedência, unários, chamadas, indexação, acesso a campo, cast, comptime.
+
+fn expr() void {
+    var a = 1 + 2 * 3 - 4 / 2;          // precedência aritmética
+    var b = (1 + 2) * 3;                // parênteses
+    var c = a < b && b > 0 || a == 0;   // lógicos e comparações
+    var d = a & b | c ^ 1;              // bitwise
+    var e = -a + !c;                    // unários prefixos
+    var f = *ptr + ~mask;               // deref e complemento
+    var g = obj.campo;                  // acesso a campo
+    var h = ptr->prox;                  // acesso via ponteiro
+    var i = arr[a + 1];                 // indexação
+    var j = soma(a, b);                 // chamada
+    var k = matriz[a][b].valor;         // encadeamento
+    var l = (i32) valor_f64;            // cast
+    var m = comptime soma(1, 2);        // chamada em comptime
+}

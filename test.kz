@@ -35,14 +35,16 @@ const Bits = union {
 
 // Error handling
 let val = try parse(input);
-let val = parse(input) catch return;
+let val = catch(parse(input), 0);
 let val = parse(input)!;
 
-// Match
-match color {
-    Color::Red   => { }
-    Color::Green => { }
-    Color::Blue  => { }
+// Match (statement — must live inside a function, not at top level)
+fn handle(color: Color) void {
+    match color {
+        Color::Red   => { }
+        Color::Green => { }
+        Color::Blue  => { }
+    }
 }
 
 // C interop
@@ -72,4 +74,16 @@ when @os("linux") {
     // windows-specific
 } else when @os("android") {
     
+}
+
+fn func() void {
+    var x = 0;
+    x++;
+    const y = x;
+    print(x, y);
+    return x + y;
+}
+
+fn main() i32 {
+    return comptime func();
 }

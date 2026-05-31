@@ -1,0 +1,17 @@
+// 006 — enums
+// simples, com discriminante, tuple-like e algébrico (campos parseados e descartados).
+
+const Cor = enum { Vermelho, Verde, Azul };
+
+const Codigo = enum { Ok = 0, Erro = 1, Desconhecido = 99 };
+
+const Msg = enum {
+    Sair,
+    Mover{ x: i32, y: i32 },
+    Escrever(*const u8),
+};
+
+fn usa() void {
+    const c = Cor::Vermelho;
+    const m = Msg::Sair;
+}

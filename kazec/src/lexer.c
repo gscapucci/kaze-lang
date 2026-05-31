@@ -39,6 +39,28 @@ static void keyword_map_init(HashMap *map, Arena *arena) {
         {"struct", TOKEN_STRUCT},
         {"return", TOKEN_RETURN},
         {"union", TOKEN_UNION},
+        {"let", TOKEN_LET},
+        {"if", TOKEN_IF},
+        {"else", TOKEN_ELSE},
+        {"while", TOKEN_WHILE},
+        {"for", TOKEN_FOR},
+        {"in", TOKEN_IN},
+        {"break", TOKEN_BREAK},
+        {"continue", TOKEN_CONTINUE},
+        {"true", TOKEN_TRUE},
+        {"false", TOKEN_FALSE},
+        {"null", TOKEN_NULL},
+        {"enum", TOKEN_ENUM},
+        {"import", TOKEN_IMPORT},
+        {"match", TOKEN_MATCH},
+        {"defer", TOKEN_DEFER},
+        {"panic", TOKEN_PANIC},
+        {"try", TOKEN_TRY},
+        {"f32", TOKEN_F32},
+        {"f64", TOKEN_F64},
+        {"bool", TOKEN_BOOL},
+        {"void", TOKEN_VOID},
+        {"type", TOKEN_TYPE},
     };
     
     *map = hashmap_create(arena, 0);
@@ -139,13 +161,18 @@ static void skip_white_space(Lexer *lexer) {
         if (lexer_peek(lexer) == '/' && lexer_peek_next(lexer) == '*') {
             lexer_advance(lexer); // /
             lexer_advance(lexer); // *
+            bool closed = false;
             while (!lexer_is_at_end(lexer)) {
                 if (lexer_peek(lexer) == '*' && lexer_peek_next(lexer) == '/') {
                     lexer_advance(lexer); // *
                     lexer_advance(lexer); // /
+                    closed = true;
                     break;
                 }
                 lexer_advance(lexer);
+            }
+            if (!closed) {
+                lexer_emit_error(lexer, "unterminated block comment");
             }
             continue;
         }
@@ -207,6 +234,7 @@ static Token lexer_triple_char_op(Lexer *lexer) {
     } op[] = {
         {"<<=", TOKEN_LESS_LESS_EQ},
         {">>=", TOKEN_GREATER_GREATER_EQ},
+        {"...", TOKEN_ELLIPSIS},
     };
     for(size_t i = 0; i < ARR_LEN(op); i++) {
         const char *operator = op[i].op;
@@ -239,6 +267,13 @@ static Token lexer_double_char_op(Lexer *lexer) {
         {"==", TOKEN_EQ_EQ},
         {"!=", TOKEN_BANG_EQ},
         {"%=", TOKEN_MOD_EQ},
+        {"&&", TOKEN_AMP_AMP},
+        {"||", TOKEN_PIPE_PIPE},
+        {"++", TOKEN_PLUS_PLUS},
+        {"--", TOKEN_MINUS_MINUS},
+        {"->", TOKEN_ARROW},
+        {"=>", TOKEN_FAT_ARROW},
+        {"::", TOKEN_COLON_COLON},
     };
     for(size_t i = 0; i < ARR_LEN(op); i++) {
         const char *operator = op[i].op;
@@ -278,7 +313,11 @@ static Token lexer_single_char_op(Lexer *lexer) {
         {"[", TOKEN_LBRACKET},
         {"]", TOKEN_RBRACKET},
         {"!", TOKEN_BANG},
-        {"@", TOKEN_AT}
+        {"@", TOKEN_AT},
+        {"&", TOKEN_AMP},
+        {"|", TOKEN_PIPE},
+        {"^", TOKEN_CARET},
+        {"~", TOKEN_TILDE},
     };
     for(size_t i = 0; i < ARR_LEN(op); i++) {
         const char *operator = op[i].op;
@@ -339,7 +378,7 @@ static Token lexer_next_token(Lexer *lexer) {
     token = token.type == TOKEN_UNDEFINED ? lexer_single_char_op(lexer) : token;
     if(token.type != TOKEN_UNDEFINED) return token;
 
-    lexer_emit_error(lexer, "Should be unreachable.\n");
+    lexer_emit_error(lexer, "unexpected character: '%c'", c);
     lexer_advance(lexer);
     return create_error_token(lexer);
 }

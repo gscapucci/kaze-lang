@@ -1,5 +1,10 @@
 #include "../include/compiler.h"
 #include "../include/lexer.h"
+#include "../include/parser.h"
+#include "../include/ast.h"
+#include "../include/sema.h"
+#include "../include/type.h"
+#include "../include/scope.h"
 #include "../../utils/include/arena.h"
 
 #include <stddef.h>
@@ -47,6 +52,20 @@ char *trim(char** input_file) {
     return *input_file;
 }
 
+// Print every top-level symbol with its resolved type (--dump-types).
+static void dump_types(Sema *sema) {
+    HashMapIter it = hashmap_iter(&sema->global->symbols);
+    const char *key;
+    void *value;
+    while (hashmap_next(&it, &key, &value)) {
+        Symbol *sym = (Symbol *)value;
+        printf("%-8s %.*s : %s\n",
+               symbol_kind_to_string(sym->kind),
+               (int)sym->name.len, sym->name.data,
+               type_to_string(sym->type, sema->arena));
+    }
+}
+
 int compile(CompilerOpt *opt) {
     int ret = 0;
     Arena *arena = arena_new(0);
@@ -58,13 +77,7 @@ int compile(CompilerOpt *opt) {
     lexer_init(&lexer, input_file, arena);
     
     TokenVec tokens = lexer_get_tokens(&lexer);
-    // if(lexer.errors.len > 0) {
-    //     for(size_t i = 0; i < lexer.errors.len; i++) {
-    //         fprintf(stderr, "Error: %s\n", ErrorVec_get(&lexer.errors, i));
-    //     }
-    //     arena_delete(arena);
-    //     return 1;
-    // }
+
     if(opt_has(&opt->opts, OPT_DUMP_TOKENS)) {
         for(size_t i = 0; i < tokens.len; i++) {
             Token token = TokenVec_get(&tokens, i);
@@ -74,10 +87,52 @@ int compile(CompilerOpt *opt) {
         return 0;
     }
 
-    // Parser parser;
-    // parser_init(&parser, tokens, arena);
-    // Program program = parse(&parser, tokens);
-    // if(program)
+    if(lexer.errors.len > 0) {
+        for(size_t i = 0; i < lexer.errors.len; i++) {
+            fprintf(stderr, "error: %s\n", ErrorVec_get(&lexer.errors, i));
+        }
+        arena_delete(arena);
+        return 1;
+    }
+
+    Parser parser;
+    parser_init(&parser, tokens, arena, opt->input_file);
+    Program program = parse_program(&parser);
+
+    if(parser.errors.len > 0) {
+        for(size_t i = 0; i < parser.errors.len; i++) {
+            fprintf(stderr, "error: %s\n", ErrorVec_get(&parser.errors, i));
+        }
+        arena_delete(arena);
+        return 1;
+    }
+
+    if(opt_has(&opt->opts, OPT_DUMP_AST)) {
+        for(size_t i = 0; i < program.decl_count; i++) {
+            ast_print_tree(program.decls[i], 0);
+        }
+        arena_delete(arena);
+        return 0;
+    }
+
+    Sema sema;
+    sema_init(&sema, arena, opt->input_file);
+    sema_check(&sema, &program);
+
+    if(sema.errors.len > 0) {
+        for(size_t i = 0; i < sema.errors.len; i++) {
+            fprintf(stderr, "error: %s\n", ErrorVec_get(&sema.errors, i));
+        }
+        arena_delete(arena);
+        return 1;
+    }
+
+    if(opt_has(&opt->opts, OPT_DUMP_TYPES)) {
+        dump_types(&sema);
+        arena_delete(arena);
+        return 0;
+    }
+
     arena_delete(arena);
     return ret;
 }

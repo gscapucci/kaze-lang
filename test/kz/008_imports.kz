@@ -1,0 +1,23 @@
+// 008 — imports
+// import simples, import seletivo e @cimport (expressão que retorna um
+// namespace, acessado com '::'); inclui a forma com opções '.defines'.
+
+import "std/io";
+import "std/mem" { alloc, free };
+import "std/math" { sin, cos, sqrt };
+
+const c = @cimport("string.h");
+const sdl = @cimport("SDL3/SDL.h");
+
+const stb = @cimport("stb_image.h", .{
+    .defines = {"STB_IMAGE_IMPLEMENTATION"},
+});
+
+const stb_tt = @cimport("stb_truetype.h", .{
+    .defines = {"STB_TRUETYPE_IMPLEMENTATION", "STB_RECT_PACK_IMPLEMENTATION"},
+});
+
+fn usa() void {
+    const n = c::strlen(str);
+    const w = sdl::SDL_CreateWindow(titulo);
+}

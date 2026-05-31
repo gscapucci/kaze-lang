@@ -1,0 +1,5 @@
+// 000 — arquivo vazio (só comentários)
+// Deve parsear para um Program com zero declarações.
+
+/* comentário
+   de bloco */

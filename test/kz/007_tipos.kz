@@ -1,0 +1,12 @@
+// 007 — tipos e aliases
+// primitivo, ponteiro, ponteiro const, array, slice, tipo de função.
+// Obs.: aliases precisam começar com um token de tipo (*, [, fn, ou primitivo).
+
+const Inteiro = i64;
+const Ptr = *u8;
+const PtrConst = *const u8;
+const Buffer = [256]u8;
+const Bytes = []u8;
+const Matriz = [4][4]f32;
+const Callback = fn(i32, i32) i32;
+const Aninhado = *[]*const u8;

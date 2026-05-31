@@ -19,6 +19,8 @@ typedef enum TokenType {
     TOKEN_LESS_LESS_EQ, // <<=
     TOKEN_GREATER_GREATER_EQ, // >>=
 
+    TOKEN_ELLIPSIS, // ...
+
     TOKEN_LESS_LESS, // <<
     TOKEN_GREATER_GREATER, // >>
     TOKEN_LESS_EQ, // <=
@@ -30,6 +32,13 @@ typedef enum TokenType {
     TOKEN_EQ_EQ, // ==
     TOKEN_BANG_EQ, // !=
     TOKEN_MOD_EQ, // %=
+    TOKEN_AMP_AMP, // &&
+    TOKEN_PIPE_PIPE, // ||
+    TOKEN_PLUS_PLUS, // ++
+    TOKEN_MINUS_MINUS, // --
+    TOKEN_ARROW, // ->
+    TOKEN_FAT_ARROW, // =>
+    TOKEN_COLON_COLON, // ::
 
     TOKEN_EQ, // =
     TOKEN_DOT, // .
@@ -40,6 +49,10 @@ typedef enum TokenType {
     TOKEN_MOD, // %
     TOKEN_LESS, // <
     TOKEN_GREATER, // >
+    TOKEN_AMP, // &
+    TOKEN_PIPE, // |
+    TOKEN_CARET, // ^
+    TOKEN_TILDE, // ~
 
     TOKEN_LBRACE, // {
     TOKEN_RBRACE, // }
@@ -71,6 +84,28 @@ typedef enum TokenType {
     TOKEN_STRUCT,
     TOKEN_RETURN,
     TOKEN_UNION,
+    TOKEN_LET,
+    TOKEN_IF,
+    TOKEN_ELSE,
+    TOKEN_WHILE,
+    TOKEN_FOR,
+    TOKEN_IN,
+    TOKEN_BREAK,
+    TOKEN_CONTINUE,
+    TOKEN_TRUE,
+    TOKEN_FALSE,
+    TOKEN_NULL,
+    TOKEN_ENUM,
+    TOKEN_IMPORT,
+    TOKEN_MATCH,
+    TOKEN_DEFER,
+    TOKEN_PANIC,
+    TOKEN_TRY,
+    TOKEN_F32,
+    TOKEN_F64,
+    TOKEN_BOOL,
+    TOKEN_VOID,
+    TOKEN_TYPE,
 } TokenType;
 
 struct Token {

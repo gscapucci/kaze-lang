@@ -139,7 +139,8 @@ compile_commands.json
 coverage/
 
 
+# Bootstrapped build executables (root + utils/ + kazec/).
+# NOTE: do not add a bare `test` here — it would ignore the test/ source dir.
 main
 nob
-test
 prompt.md

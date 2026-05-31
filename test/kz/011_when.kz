@@ -1,0 +1,18 @@
+// 011 — when (compilação condicional)
+// no topo do módulo e dentro de função; com else-when e else final.
+
+when @os("linux") {
+    const plataforma = 1;
+} else when @os("windows") {
+    const plataforma = 2;
+} else {
+    const plataforma = 0;
+}
+
+fn configura() void {
+    when @os("linux") {
+        usar_epoll();
+    } else {
+        usar_select();
+    }
+}

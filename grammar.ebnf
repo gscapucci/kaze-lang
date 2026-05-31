@@ -1,0 +1,357 @@
+(* ================================================================
+   Kaze Language Grammar — v0.0.1
+
+   Notation (ISO EBNF):
+     rule = ... ;        definition
+     A | B               alternation
+     [ A ]               optional (zero or one)
+     { A }               repetition (zero or more)
+     ( A )               grouping
+     "text"              literal terminal
+     UPPER               lexical token produced by the lexer
+   ================================================================ *)
+
+
+(* ── Program ──────────────────────────────────────────────────── *)
+
+program = { top_decl } EOF ;
+
+top_decl
+    = decl_function
+    | decl_struct
+    | decl_enum
+    | decl_union
+    | decl_type_alias
+    | decl_import
+    | decl_var
+    | when_block
+    ;
+
+
+(* ── Declarations ─────────────────────────────────────────────── *)
+
+decl_function
+    = { attribute } "fn" IDENT "(" [ param_list ] ")" type block
+    ;
+
+param_list = param { "," param } [ "," ] ;
+
+param
+    = [ "comptime" ] IDENT ":" type
+    | IDENT ":" "..." type          (* variadic *)
+    ;
+
+(* Structs are always assigned to a name via const/let:
+       const Vec2 = struct { ... };   *)
+decl_struct
+    = "const" IDENT "=" "struct" "{" { struct_member } "}" ";"
+    ;
+
+struct_member
+    = IDENT ":" type ","        (* field *)
+    | decl_function             (* method *)
+    ;
+
+(* Enums support plain, discriminant, tuple-like, and algebraic variants:
+       const Color = enum { Red, Green, Blue };
+       const Msg   = enum { Quit, Move{ x: i32, y: i32 }, Write(*const u8) };  *)
+decl_enum
+    = "const" IDENT "=" "enum" "{" { enum_variant } "}" ";"
+    ;
+
+enum_variant
+    = IDENT [ "=" expr ]                              (* plain / with discriminant *)
+    | IDENT "(" type ")"                              (* tuple-like *)
+    | IDENT "{" { IDENT ":" type "," } "}"           (* algebraic (named fields) *)
+    ;
+
+(* Unions are for C interop:
+       const Bits = union { as_i32: i32, as_f32: f32 };  *)
+decl_union
+    = "const" IDENT "=" "union" "{" { IDENT ":" type "," } "}" ";"
+    ;
+
+decl_type_alias
+    = "const" IDENT [ generic_params ] "=" type ";"
+    ;
+
+(* Imports a Kaze module by path. The optional brace list imports select names.
+       import "std/io";
+       import "std/io" { println, eprintln };
+
+   C headers are NOT imported here: @cimport is an *expression* (see builtin_expr)
+   that returns a namespace struct, bound to a name and accessed with "::":
+       const c = @cimport("string.h");
+       const n = c::strlen(str);   *)
+decl_import
+    = "import" STRING_LIT [ "{" IDENT { "," IDENT } "}" ] ";"
+    ;
+
+cimport_opts = "." "{" { "." IDENT "=" "{" STRING_LIT { "," STRING_LIT } "}" } "}" ;
+
+decl_var
+    = ( "var" | "const" | "let" ) IDENT [ ":" type ] "=" expr ";"
+    | ( "var" | "const" | "let" ) IDENT ":" type ";"
+    ;
+
+
+(* ── Statements ───────────────────────────────────────────────── *)
+
+statement
+    = stmt_var_decl
+    | stmt_assignment
+    | stmt_if
+    | stmt_while
+    | stmt_for
+    | stmt_return
+    | stmt_break
+    | stmt_continue
+    | stmt_defer
+    | stmt_match
+    | when_block
+    | block
+    | stmt_expr
+    ;
+
+block = "{" { statement } "}" ;
+
+stmt_var_decl
+    = ( "var" | "const" | "let" ) IDENT [ ":" type ] [ "=" expr ] ";"
+    ;
+
+stmt_assignment
+    = expr assign_op expr ";"
+    ;
+
+assign_op
+    = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>="
+    ;
+
+stmt_if
+    = "if" expr block [ "else" ( block | stmt_if ) ]
+    ;
+
+stmt_while = "while" expr block ;
+
+stmt_for = "for" IDENT "in" expr block ;
+
+stmt_return = "return" [ expr ] ";" ;
+
+stmt_break    = "break"    [ IDENT ] ";" ;
+stmt_continue = "continue" [ IDENT ] ";" ;
+
+stmt_defer = "defer" ( stmt_expr | block ) ;
+
+stmt_match
+    = "match" expr "{" { match_arm } "}"
+    ;
+
+match_arm = pattern "=>" block ;
+
+stmt_expr = expr ";" ;
+
+
+(* ── Conditional Compilation ──────────────────────────────────── *)
+
+(* "when" is resolved at compile time — not a runtime conditional:
+       when @os("linux") { ... } else when @os("windows") { ... } else { ... }  *)
+when_block
+    = "when" expr block { "else" "when" expr block } [ "else" block ]
+    ;
+
+
+(* ── Expressions (ordered by precedence, lowest first) ───────── *)
+
+expr = expr_comptime | expr_try | expr_assign ;
+
+expr_comptime = "comptime" expr ;
+
+expr_try = "try" expr ;
+
+expr_assign
+    = expr_or [ assign_op expr_or ]
+    ;
+
+expr_or  = expr_and  { "||" expr_and  } ;
+expr_and = expr_bor  { "&&" expr_bor  } ;
+expr_bor = expr_bxor { "|"  expr_bxor } ;
+expr_bxor= expr_band { "^"  expr_band } ;
+expr_band= expr_eq   { "&"  expr_eq   } ;
+
+expr_eq
+    = expr_cmp { ( "==" | "!=" ) expr_cmp }
+    ;
+
+expr_cmp
+    = expr_shift { ( "<" | ">" | "<=" | ">=" ) expr_shift }
+    ;
+
+expr_shift
+    = expr_add { ( "<<" | ">>" ) expr_add }
+    ;
+
+expr_add
+    = expr_mul { ( "+" | "-" ) expr_mul }
+    ;
+
+expr_mul
+    = expr_unary { ( "*" | "/" | "%" ) expr_unary }
+    ;
+
+expr_unary
+    = ( "-" | "!" | "*" | "&" | "~" ) expr_unary
+    | expr_postfix
+    ;
+
+expr_postfix
+    = expr_primary { postfix }
+    ;
+
+postfix
+    = "."  IDENT                            (* field access:          point.x      *)
+    | "->" IDENT                            (* pointer field access:  ptr->x       *)
+    | "[" expr "]"                          (* index:                 arr[i]       *)
+    | "(" [ arg_list ] ")"                  (* call:                  foo(a, b)    *)
+    | "::" IDENT                            (* scope resolution:      Color::Red, c::strlen *)
+    | "++"                                  (* postfix increment:     x++          *)
+    | "--"                                  (* postfix decrement:     x--          *)
+    | "!"                                   (* error unwrap:          val!         *)
+    ;
+    (* error handling other than `try`/`!` is done via stdlib functions, e.g.
+       catch(parse(x), 0) — `catch` is not a keyword. *)
+
+arg_list = expr { "," expr } [ "," ] ;
+
+expr_primary
+    = INT_LIT
+    | FLOAT_LIT
+    | STRING_LIT
+    | "true"
+    | "false"
+    | "null"
+    | IDENT
+    | struct_literal
+    | "(" expr ")"
+    | builtin_expr
+    | panic_expr
+    | expr_cast
+    ;
+
+(* panic is a keyword for now; may become an ordinary stdlib function later.
+   Aborts the process immediately, no stack unwinding (see langspec §12.4). *)
+panic_expr = "panic" "(" [ expr ] ")" ;
+
+(* Struct literal:  Vec2{.x = 1.0, .y = 2.0}  *)
+struct_literal
+    = IDENT "{" { "." IDENT "=" expr "," } "}"
+    ;
+
+(* Cast:  (i32) value  *)
+expr_cast = "(" type ")" expr_unary ;
+
+
+(* ── Builtin Expressions ──────────────────────────────────────── *)
+
+builtin_expr
+    = "@cimport"       "(" STRING_LIT [ "," cimport_opts ] ")"
+    | "@os"            "(" STRING_LIT ")"
+    | "@compile_error" "(" STRING_LIT ")"
+    | "@format"        "(" STRING_LIT { "," expr } ")"   (* comptime-checked format string *)
+    | "@file"          "(" ")"
+    | "@line"          "(" ")"
+    | "@function"      "(" ")"
+    ;
+
+
+(* ── Attributes ───────────────────────────────────────────────── *)
+
+(* Appear before fn declarations to set calling convention or linkage:
+       @cdecl fn foo() void { ... }  *)
+attribute
+    = "@cdecl"
+    | "@stdcall"
+    | "@fastcall"
+    | "@extern"
+    | "@inline"
+    | "@" IDENT
+    ;
+
+
+(* ── Types ────────────────────────────────────────────────────── *)
+
+type
+    = type_primitive
+    | type_pointer
+    | type_array
+    | type_slice
+    | type_function
+    | type_generic
+    | IDENT              (* named type / type alias / Self *)
+    ;
+
+type_primitive
+    = "i8" | "i16" | "i32" | "i64"
+    | "u8" | "u16" | "u32" | "u64"
+    | "f32" | "f64"
+    | "bool"
+    | "void"
+    | "type"             (* comptime type value *)
+    ;
+
+type_pointer  = "*" [ "const" ] type ;
+type_array    = "[" INT_LIT "]" type ;
+type_slice    = "[" "]" type ;
+type_function = "fn" "(" [ param_type_list ] ")" type ;
+type_generic  = IDENT "(" type { "," type } ")" ;
+
+param_type_list = type { "," type } ;
+
+generic_params = "(" IDENT { "," IDENT } ")" ;
+
+
+(* ── Patterns ─────────────────────────────────────────────────── *)
+
+pattern
+    = "_"                               (* wildcard       *)
+    | IDENT "::" IDENT                  (* enum variant   *)
+    | IDENT "{" { IDENT "," } "}"       (* struct pattern *)
+    | "(" { pattern "," } ")"          (* tuple pattern  *)
+    | INT_LIT                           (* literal        *)
+    | FLOAT_LIT
+    | STRING_LIT
+    | "true" | "false" | "null"
+    | IDENT                             (* variable bind — must come last *)
+    ;
+
+
+(* ── Lexical Tokens ───────────────────────────────────────────── *)
+
+INT_LIT    = digit { digit } ;
+FLOAT_LIT  = digit { digit } "." digit { digit } ;
+STRING_LIT = '"' { string_char } '"' ;
+IDENT      = alpha { alphanum } ;
+EOF        = (* end of input *) ;
+
+string_char = (* any character except '"' and newline *)
+            | "\" '"'           (* escaped double-quote *)
+            | "\" "\"           (* escaped backslash    *)
+            | "\" "n"           (* newline              *)
+            | "\" "t"           (* tab                  *)
+            | "\" "r"           (* carriage return      *)
+            ;
+
+digit    = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+alpha    = "a" ... "z" | "A" ... "Z" | "_" ;
+alphanum = alpha | digit ;
+
+(* Whitespace and comments are skipped between tokens.
+   Line comment:  // ... newline
+   Block comment: /* ... */               *)
+
+(* ── Keywords (reserved; not valid as IDENT) ──────────────────── *)
+
+(* fn  var  const  let  comptime  when  return
+   struct  enum  union  import
+   if  else  while  for  in  match  break  continue  defer  panic
+   true  false  null
+   i8  i16  i32  i64  u8  u16  u32  u64  f32  f64  bool  void  type  *)

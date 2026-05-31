@@ -1,0 +1,29 @@
+// 004 — controle de fluxo
+// if/else encadeado, while, for..in, return, break, continue, atribuições.
+
+fn fluxo(n: i32) i32 {
+    var acc = 0;
+
+    if n > 100 {
+        acc = 100;
+    } else if n > 10 {
+        acc = 10;
+    } else {
+        acc = n;
+    }
+
+    while acc > 0 {
+        acc -= 1;
+        if acc == 5 {
+            break;
+        }
+        continue;
+    }
+
+    for item in colecao {
+        acc += item.peso;
+        total *= 2;
+    }
+
+    return acc;
+}

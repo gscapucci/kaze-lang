@@ -1,0 +1,18 @@
+// 012 — union, métodos de struct e struct literals.
+
+const Bits = union {
+    as_i32: i32,
+    as_f32: f32,
+};
+
+const Vec2 = struct {
+    x: f32,
+    y: f32,
+    fn comprimento(self: *Self) f32 { return self.x; }
+    fn zero() Vec2 { return Vec2{ .x = 0.0, .y = 0.0 }; }
+};
+
+fn cria() void {
+    var v = Vec2{ .x = 1.0, .y = 2.0 };
+    var origem = Vec2{ .x = 0.0, .y = 0.0 };
+}

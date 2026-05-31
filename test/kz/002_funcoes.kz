@@ -1,0 +1,26 @@
+// 002 — funções
+// parâmetros, tipo de retorno, atributos, comptime e variádicos.
+
+fn nada() void {
+    return;
+}
+
+fn soma(a: i32, b: i32) i32 {
+    return a + b;
+}
+
+@inline fn dobro(x: i32) i32 {
+    return x * 2;
+}
+
+@extern fn puts(s: *const u8) i32 {
+    return 0;
+}
+
+fn generica(comptime T: type, valor: i32) i32 {
+    return valor;
+}
+
+fn printf(fmt: *const u8, args: ...i32) void {
+    return;
+}

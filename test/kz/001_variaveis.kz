@@ -1,0 +1,9 @@
+// 001 — declarações de variáveis
+// var (mutável), let/const (imutáveis); com e sem anotação de tipo.
+
+var x: i32 = 0;
+var contador = 10;
+let nome = "mundo";
+const PI: f64 = 3.14159;
+const ativo: bool = true;
+const vazio = null;
