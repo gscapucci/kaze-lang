@@ -8,6 +8,8 @@ Kaze is a systems programming language compiler written in C. The compiler (`kaz
 
 **Primary goal:** a single Kaze program must run **identically across Desktop, Web, and Android.** "Write once, run the same everywhere" is the north star — language, semantics, and standard library are designed to behave consistently on all three targets, and every design decision should be weighed against this portability guarantee. (C codegen is the first backend; Web/Android targeting follows from it.)
 
+**Developer freedom + compiler-enforced portability:** the programmer is free to work at any level — from bare metal up to Web and Android — and the compiler takes responsibility for portability across the selected targets. The key consequence: **when something cannot be made portable to a target, it is a compile error, not undefined or silently-degraded runtime behavior.** For example, using raw `malloc`/`free` in code compiled for the Web target must fail to compile (the Web target has no such allocator model), steering the developer toward a portable construct instead. In short: low-level power is available, but the compiler statically rejects anything that would break the "runs identically everywhere" guarantee for the chosen target set. This implies the type/semantic system must eventually track per-target capability requirements and validate them during compilation.
+
 ## Build System
 
 The project uses [nob](https://github.com/tsoding/nob.h) — a single-header C build system. The root `nob.c` orchestrates sub-builds in `utils/` and `kazec/`, then links everything into `./build/kazec`.
